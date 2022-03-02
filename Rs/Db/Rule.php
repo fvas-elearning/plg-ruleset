@@ -4,6 +4,7 @@ namespace Rs\Db;
 
 use Bs\Db\Traits\CreatedTrait;
 use Bs\Db\Traits\OrderByTrait;
+use Bs\Db\Traits\TimestampTrait;
 use Rs\Plugin;
 use Uni\Db\Traits\CourseTrait;
 
@@ -15,7 +16,7 @@ use Uni\Db\Traits\CourseTrait;
 class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
 {
     use CourseTrait;
-    use CreatedTrait;
+    use TimestampTrait;
     use OrderByTrait;
 
     const VALID_NULL = 128;
@@ -66,6 +67,13 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
     public $max = 0.0;
 
     /**
+     * if false then this rule can be selectable in the placement edit pages
+     *
+     * @var boolean
+     */
+    public $static = true;
+
+    /**
      * @var string
      */
     public $assert = '';
@@ -83,6 +91,11 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
     /**
      * @var \DateTime
      */
+    public $modified = null;
+
+    /**
+     * @var \DateTime
+     */
     public $created = null;
 
 
@@ -92,20 +105,19 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
      */
     public function __construct()
     {
-        $this->_CreatedTrait();
+        $this->_TimestampTrait();
     }
 
     /**
      * eval() and return the result of the script
      *
-     * @param \App\Db\Subject $subject
+     * NOTE: I have removed subject and supervisor, this should still work as expected
+     *
      * @param \App\Db\Company $company
-     * @param \App\Db\Supervisor|null $supervisor
      * @return boolean
      */
-    public function evaluate($subject, $company, $supervisor = null)
+    public function evaluate($company)
     {
-        // TODO: place any global objects required for eval() here.
         if ($this->getScript()) {
             return eval($this->getScript());
         }
@@ -210,7 +222,7 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
      * @param int $max
      * @return int
      */
-    static function validateUnits($units, $min = 0, $max = 0)
+    public static function validateUnits($units, $min = 0, $max = 0)
     {
         $units = (float)$units;
         $min = (float)$min;
@@ -231,7 +243,8 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
             } else if ($units >= $min) {
                 return self::VALID_OK;
             }
-        } else if ($units <= $min) {
+        //} else if ($units <= $min) {
+        } else if ($units < $min) {
             return self::VALID_BELOW;
         } else if ($units > $max) {
             return self::VALID_OUT;
@@ -364,6 +377,24 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
     }
 
     /**
+     * @return bool
+     */
+    public function isStatic(): bool
+    {
+        return $this->static;
+    }
+
+    /**
+     * @param bool $static
+     * @return Rule
+     */
+    public function setStatic(bool $static): Rule
+    {
+        $this->static = $static;
+        return $this;
+    }
+
+    /**
      * @return string
      */
     public function getAssert(): string
@@ -422,9 +453,9 @@ class Rule extends \Tk\Db\Map\Model implements \Tk\ValidInterface
         if (!preg_match('/^[0-9]*(.[0-9]*)?$/', $this->getMax())) {
             $errors['max'] = 'Invalid Max. units Value.';
         }
-        if (!$this->getMin() && !$this->getMax()) {
-            $errors['min'] = 'Min and/or Max Units must have a valid value.';
-        }
+//        if (!$this->getMin() && !$this->getMax()) {
+//            $errors['min'] = 'Min and/or Max Units must have a valid value.';
+//        }
         if ($this->getMin() && $this->getMax() && ($this->getMin() > $this->getMax())) {
             $errors['max'] = 'Max Unit must be greater than Min Units';
         }

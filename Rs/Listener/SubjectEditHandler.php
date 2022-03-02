@@ -1,7 +1,12 @@
 <?php
 namespace Rs\Listener;
 
+use App\Event\SubjectEvent;
+use Bs\DbEvents;
+use Rs\Db\Rule;
+use Tk\ConfigTrait;
 use Tk\Event\Subscriber;
+use Uni\Db\Subject;
 
 
 /**
@@ -11,6 +16,7 @@ use Tk\Event\Subscriber;
  */
 class SubjectEditHandler implements Subscriber
 {
+    use ConfigTrait;
 
     /**
      * @param \Tk\Event\Event $event
@@ -30,10 +36,20 @@ class SubjectEditHandler implements Subscriber
         }
     }
 
+
     /**
-     * @param \Tk\Event\Event $event
+     * @param SubjectEvent $event
+     * @throws \Exception
      */
-    public function onControllerShow(\Tk\Event\Event $event) { }
+    public function onSubjectPostClone(SubjectEvent $event)
+    {
+        $list = \Rs\Db\RuleMap::create()->findFiltered(['subjectId' => $event->getSubject()->getId()]);
+        foreach ($list as $rule) {
+            if ($rule->isActive($event->getSubject()->getId())) {
+                \Rs\Db\RuleMap::create()->setActive($rule->getId(), $event->getClone()->getId(), true);
+            }
+        }
+    }
 
     /**
      * @return array The event names to listen to
@@ -43,7 +59,7 @@ class SubjectEditHandler implements Subscriber
     {
         return array(
             \Tk\PageEvents::CONTROLLER_INIT => array('onControllerInit', 0),
-            \Tk\PageEvents::CONTROLLER_SHOW => array('onControllerShow', 0)
+            \App\AppEvents::SUBJECT_POST_CLONE => 'onSubjectPostClone'
         );
     }
     

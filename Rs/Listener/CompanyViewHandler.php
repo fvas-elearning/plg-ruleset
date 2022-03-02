@@ -47,7 +47,7 @@ class CompanyViewHandler implements Subscriber
         $template = $this->controller->getTemplate();
 
         $repeat = $template->getRepeat('infoData');
-        $repeat->insertText('label', 'Assessment Credit:');
+        $repeat->insertText('label', 'Default Assessment Credit:');
         $html = '';
         foreach ($companyRules as $rule) {
             $html .= sprintf('<li>%s</li>', $rule->name) . "\n";

@@ -64,6 +64,7 @@ class RuleEdit extends \App\Controller\AdminEditIface
 
         $this->getForm()->appendField(new Field\Input('name'));
         $this->getForm()->appendField(new Field\Input('label'));
+            $this->getForm()->appendField(Field\Checkbox::create('static')->setCheckboxLabel('Static rules are not selectable in the company and placement records'));
         $this->getForm()->appendField(new \App\Form\Field\MinMax('min', 'max'));
         $this->getForm()->appendField(new Field\Input('description'));
         if ($this->getConfig()->isSubjectUrl()) {

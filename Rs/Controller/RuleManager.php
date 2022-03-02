@@ -45,11 +45,14 @@ class RuleManager extends \App\Controller\AdminManagerIface
         $this->getTable()->appendCell(new \Tk\Table\Cell\Checkbox('id'));
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('name'))->addCss('key')->setUrl($editUrl);
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('description'));
+        $this->getTable()->appendCell(new \Tk\Table\Cell\Boolean('static'));
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('label'));
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('assert'));
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('min'));
         $this->getTable()->appendCell(new \Tk\Table\Cell\Text('max'));
+
         $this->getTable()->appendCell(new \Tk\Table\Cell\Date('created'));
+
         if ($this->getConfig()->isSubjectUrl()) {
             $this->getTable()->appendCell(new \Tk\Table\Cell\Checkbox('activeCb'))->setLabel('Active')->setUseValue(true)
                 ->addOnPropertyValue(function ($cell, $obj, $value) {
@@ -121,7 +124,7 @@ class RuleManager extends \App\Controller\AdminManagerIface
 
         if ($this->getConfig()->isSubjectUrl()) {
             $template->setVisible('subjectUrl');
-            $template->setAttr('rulesManager', 'href', \Uni\Uri::createHomeUrl('/courseEdit.html')->set('courseId', $this->getCourseId()));
+            $template->setAttr('courseEdit', 'href', \Uni\Uri::createHomeUrl('/courseEdit.html')->set('courseId', $this->getCourseId()));
             $js = <<<JS
 jQuery(function ($) {
   
@@ -159,9 +162,8 @@ JS;
 <div class="tk-panel" data-panel-title="Rule Manager" data-panel-icon="fa fa-check" var="panel">     
   <p choice="subjectUrl">
     NOTE: You can only activate and deactivate rules from here. 
-    Use the <a herf="#" var="rulesManager">Rules Manager</a> to edit the rule records.
+    Use the <a herf="#" var="courseEdit">Course Edit page</a> to edit the rule records.
   </p>
-  
 </div>
 HTML;
 

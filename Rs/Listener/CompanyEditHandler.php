@@ -37,6 +37,8 @@ class CompanyEditHandler implements Subscriber
     }
 
     /**
+     * TODO: this autoApprove value whould be part of the company object and not in the Rs plugin
+     *
      * @param \Tk\Event\FormEvent $event
      * @throws \Exception
      */
@@ -48,7 +50,7 @@ class CompanyEditHandler implements Subscriber
         $form = $event->getForm();
 
         $form->appendField(new \Tk\Form\Field\Checkbox('autoApprove'), 'web')->setValue('autoApprove')->setTabGroup('Details')
-            ->setCheckboxLabel('Placements applying with this company can be Auto-Approved.');
+            ->setCheckboxLabel('Placement requests with this company can be Auto-Approved.');
 
         if ($form->getField('update'))
             $form->getField('update')->appendCallback(array($this, 'doSubmit'));
@@ -58,6 +60,8 @@ class CompanyEditHandler implements Subscriber
     }
 
     /**
+     * TODO: this autoApprove value whould be part of the company object and not in the Rs plugin
+     *
      * @param \Tk\Event\FormEvent $event
      * @throws \Exception
      */
@@ -73,6 +77,8 @@ class CompanyEditHandler implements Subscriber
     }
 
     /**
+     * TODO: this autoApprove value would be part of the company object and not in the Rs plugin
+     *
      * @param \Tk\Form $form
      * @param \Tk\Form\Event\Iface $event
      * @throws \Exception

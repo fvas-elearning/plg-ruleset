@@ -12,12 +12,12 @@ class Calculator extends \Tk\ObjectUtil
 {
 
     /**
-     * @var \App\Db\User
+     * @var \Uni\Db\UserIface
      */
     protected $user = null;
 
     /**
-     * @var \App\Db\Subject
+     * @var \Uni\Db\SubjectIface
      */
     protected $subject = null;
 
@@ -53,8 +53,8 @@ class Calculator extends \Tk\ObjectUtil
 
 
     /**
-     * @param \App\Db\Subject $subject
-     * @param \App\Db\User $user
+     * @param \Uni\Db\SubjectIface $subject
+     * @param \Uni\Db\UserIface $user
      * @throws \Exception
      */
     protected function __construct($subject, $user)
@@ -68,8 +68,8 @@ class Calculator extends \Tk\ObjectUtil
     /**
      * calculate and return an instance of this object holding the calculated data
      *
-     * @param \App\Db\Subject $subject
-     * @param \App\Db\User $user
+     * @param \Uni\Db\SubjectIface $subject
+     * @param \Uni\Db\UserIface $user
      * @return Calculator
      * @throws \Exception
      */
@@ -122,14 +122,20 @@ class Calculator extends \Tk\ObjectUtil
                 if (!isset($totals[$rule->getLabel()])) {
                     $totals[$rule->getLabel()]['total'] = 0;
                     $totals[$rule->getLabel()]['completed'] = 0;
+                    $totals[$rule->getLabel()]['approved'] = 0;
+                    $totals[$rule->getLabel()]['evaluating'] = 0;
                     $totals[$rule->getLabel()]['pending'] = 0;
                 }
                 if (self::hasRule($rule, $placeRules)) {
                     $totals[$rule->getLabel()]['total'] += $units;
                     if ($placement->status == \App\Db\Placement::STATUS_COMPLETED) {
                         $totals[$rule->getLabel()]['completed'] += $units;
-                    } else {
+                    } else if ($placement->status == \App\Db\Placement::STATUS_PENDING) {
                         $totals[$rule->getLabel()]['pending'] += $units;
+                    } else if ($placement->status == \App\Db\Placement::STATUS_APPROVED) {
+                        $totals[$rule->getLabel()]['approved'] += $units;
+                    } else if ($placement->status != \App\Db\Placement::STATUS_CANCELLED) {
+                        $totals[$rule->getLabel()]['evaluating'] += $units;
                     }
                 }
             }
@@ -138,12 +144,18 @@ class Calculator extends \Tk\ObjectUtil
                 $totals['total'] = 0;
                 $totals['completed'] = 0;
                 $totals['pending'] = 0;
+                $totals['approved'] = 0;
+                $totals['evaluating'] = 0;
             }
             $totals['total'] += $units;
             if ($placement->status == \App\Db\Placement::STATUS_COMPLETED) {
                 $totals['completed'] += $units;
-            } else {
+            } else if ($placement->status == \App\Db\Placement::STATUS_PENDING) {
                 $totals['pending'] += $units;
+            } else if ($placement->status == \App\Db\Placement::STATUS_APPROVED) {
+                $totals['approved'] += $units;
+            } else if ($placement->status != \App\Db\Placement::STATUS_CANCELLED) {
+                $totals['evaluating'] += $units;
             }
             $termTot += $units;
         }
@@ -157,6 +169,7 @@ class Calculator extends \Tk\ObjectUtil
                 $this->ruleTotals[$rule->getLabel()]['ruleTotal'] = $rule->getMaxTarget() ? $rule->getMaxTarget() : $rule->getMinTarget();
                 $this->ruleTotals[$rule->getLabel()]['total'] = $totals[$rule->getLabel()]['total'];
                 $this->ruleTotals[$rule->getLabel()]['pending'] = $totals[$rule->getLabel()]['pending'];
+                $this->ruleTotals[$rule->getLabel()]['evaluating'] = $totals[$rule->getLabel()]['evaluating'];
                 $this->ruleTotals[$rule->getLabel()]['completed'] = $totals[$rule->getLabel()]['completed'];
                 $this->ruleTotals[$rule->getLabel()]['validCompleted'] = $rule->isTotalValid($totals[$rule->getLabel()]['completed']);
                 $this->ruleTotals[$rule->getLabel()]['validCompletedMsg'] = $rule->getValidMessage($totals[$rule->getLabel()]['completed']);
@@ -170,12 +183,15 @@ class Calculator extends \Tk\ObjectUtil
         $this->ruleTotals['total']['ruleTotal'] = $this->subject->getMaxUnitsTotal() ? $this->subject->getMaxUnitsTotal() : $this->subject->getMinUnitsTotal();
         $this->ruleTotals['total']['total'] = $totals['total'];
         $this->ruleTotals['total']['pending'] = $totals['pending'];
+        $this->ruleTotals['total']['evaluating'] = $totals['evaluating'];
         $this->ruleTotals['total']['completed'] = $totals['completed'];
         $this->ruleTotals['total']['validCompleted'] = Rule::validateUnits($totals['completed'], $this->subject->getMinUnitsTotal(), $this->subject->getMaxUnitsTotal());
         $this->ruleTotals['total']['validCompletedMsg'] = Rule::getValidateMessage($totals['completed'], $this->subject->getMinUnitsTotal(), $this->subject->getMaxUnitsTotal());
         $this->ruleTotals['total']['validTotal'] = Rule::validateUnits($totals['total'], $this->subject->getMinUnitsTotal(), $this->subject->getMaxUnitsTotal());
         $this->ruleTotals['total']['validMsg'] = Rule::getValidateMessage($totals['total'], $this->subject->getMinUnitsTotal(), $this->subject->getMaxUnitsTotal());
         $this->ruleTotals['total']['assessmentRule'] = null;
+
+        //vd($this->ruleTotals);
 
     }
 
@@ -251,7 +267,7 @@ class Calculator extends \Tk\ObjectUtil
     }
 
     /**
-     * @return \App\Db\User
+     * @return \Uni\Db\UserIface
      */
     public function getUser()
     {
@@ -259,7 +275,7 @@ class Calculator extends \Tk\ObjectUtil
     }
 
     /**
-     * @return \App\Db\Subject
+     * @return \Uni\Db\SubjectIface
      */
     public function getSubject()
     {
@@ -291,62 +307,117 @@ class Calculator extends \Tk\ObjectUtil
     {
         /** @var Rule $r */
         foreach ($ruleList as $r) {
-            if ($rule->id == $r->id) return true;
+            if ($rule->getId() == $r->getId()) return true;
         }
         return false;
     }
 
     /**
      * @param \App\Db\Placement $placement
+     * @param bool|null $static
      * @return Rule[]|\Tk\Db\Map\ArrayObject
      * @throws \Exception
      */
-    public static function findPlacementRuleList($placement)
+    public static function findPlacementRuleList($placement, $static = null)
     {
         $list = null;
         if ($placement->getId()) {
-            $list = \Rs\Db\RuleMap::create()->findFiltered(array('placementId' => $placement->getVolatileId(), 'subjectId' => $placement->subjectId),
-                \Tk\Db\Tool::create('order_by'));
+            $filter = [
+                'placementId' => $placement->getVolatileId(),
+                'subjectId' => $placement->getSubjectId()
+            ];
+            if (is_bool($static)) {
+                $filter['static'] = $static;
+            }
+            $list = \Rs\Db\RuleMap::create()->findFiltered($filter, \Tk\Db\Tool::create('order_by'));
         } else {    // Get default rules based on the company and subject object
-            $list = self::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), $placement->getSupervisor());
+            $list = self::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), $static);
         }
         return $list;
     }
 
     /**
+     * @param \App\Db\Placement $placement
+     * @return Rule
+     * @throws \Exception
+     */
+    public static function findDefaultPlacementRule($placement)
+    {
+        $default = null;
+        $list = self::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), false);
+        foreach ($list as $rule) {
+            if (strtolower($rule->getLabel()) == strtolower($placement->getCompany()->getCategoryClass())) {
+                $default = $rule;
+                break;
+            }
+        }
+        return $default;
+    }
+
+    /**
+     * Buffer to store company rule list
+     * @var array
+     */
+    public static $CO_RULE_BUFF = [];
+
+    /**
      * @param \App\Db\Company $company
-     * @param \App\Db\Subject $subject
-     * @param \App\Db\Supervisor|null $supervisor If supplied then the academic flag can be tested on this instead of the company hasAcademic()
+     * @param \Uni\Db\Subject|\Uni\Db\SubjectIface $subject
+     * @param bool|null $static
      * @return Rule[]|\Tk\Db\Map\ArrayObject
      * @throws \Exception
      */
-    public static function findCompanyRuleList($company, $subject, $supervisor = null)
+    public static function findCompanyRuleList($company, $subject, $static = null)
     {
-        $list = \Rs\Db\RuleMap::create()->findFiltered(array('courseId' => $subject->getCourseId(), 'subjectId' => $subject->getId()), \Tk\Db\Tool::create('order_by'));
+        // TODO: keep an eye on this and check it does not consume more mem than its worth
+        $key = md5($company->getId().$subject->getId().$static);
+        if (!empty(self::$CO_RULE_BUFF[$key])) {
+            return self::$CO_RULE_BUFF[$key];
+        }
+
+        $filter = [
+            'courseId' => $subject->getCourseId(),
+            'subjectId' => $subject->getId()
+        ];
+        if (is_bool($static)) {
+            $filter['static'] = $static;
+        }
+
+        $list = \Rs\Db\RuleMap::create()->findFiltered($filter, \Tk\Db\Tool::create('order_by'));
         $valid = array();
         /** @var \Rs\Db\Rule $rule */
         foreach ($list as $rule) {
-            if ($rule->evaluate($subject, $company, $supervisor)) {
+            if ($rule->evaluate($company)) {
                 $valid[] = $rule;
             }
         }
-        return new \Tk\Db\Map\ArrayObject($valid);
+        $a = new \Tk\Db\Map\ArrayObject($valid);
+        if (count(self::$CO_RULE_BUFF) > 100) $CO_RULE_BUFF = [];     // just to keep mem usage down
+        self::$CO_RULE_BUFF[$key] = $a;
+        return $a;
     }
 
     /**
-     * @param \App\Db\Subject $subject
+     * @param \Uni\Db\SubjectIface $subject
+     * @param bool|null $static
      * @return Rule[]|\Tk\Db\Map\ArrayObject
      * @throws \Exception
      */
-    public static function findSubjectRuleList($subject)
+    public static function findSubjectRuleList($subject, $static = null)
     {
-        return \Rs\Db\RuleMap::create()->findFiltered(array('courseId' => $subject->getCourseId(), 'subjectId' => $subject->getId()),
-            \Tk\Db\Tool::create('order_by'));
+        $filter = [
+            'courseId' => $subject->getCourseId(),
+            'subjectId' => $subject->getId()
+        ];
+        if (is_bool($static)) {
+            $filter['static'] = $static;
+        }
+        return \Rs\Db\RuleMap::create()->findFiltered($filter, \Tk\Db\Tool::create('order_by'));
     }
 
     /**
-     * @param \App\Db\Subject $subject
-     * @param \App\Db\User $user
+     * @param \Uni\Db\SubjectIface $subject
+     * @param \Uni\Db\UserIface $user
      * @return \App\Db\Placement[]|\Tk\Db\Map\ArrayObject
      * @throws \Exception
      */
@@ -355,7 +426,7 @@ class Calculator extends \Tk\ObjectUtil
         return \App\Db\PlacementMap::create()->findFiltered(array(
             'userId' => $user->getId(),
             'subjectId' => $subject->getId(),
-            'status' => array(\App\Db\Placement::STATUS_APPROVED, \App\Db\Placement::STATUS_ASSESSING,
+            'status' => array(\App\Db\Placement::STATUS_APPROVED, \App\Db\Placement::STATUS_ASSESSING, \App\Db\Placement::STATUS_PENDING,
                 \App\Db\Placement::STATUS_EVALUATING, \App\Db\Placement::STATUS_COMPLETED)
         ));
     }

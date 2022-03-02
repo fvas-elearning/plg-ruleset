@@ -35,20 +35,23 @@ class SetupHandler implements Subscriber
 //            $dispatcher->addSubscriber(new \Rs\Listener\ExampleHandler(Plugin::ZONE_SUBJECT, $subject->getId()));
 //        }
 
+        $dispatcher->addSubscriber(new \Rs\Listener\StudentAssessmentHandler());
+        $dispatcher->addSubscriber(new \Rs\Listener\StatusMailHandler());
 
         if ($plugin->isZonePluginEnabled(Plugin::ZONE_COURSE, \App\Config::getInstance()->getCourseId())) {
             //\Tk\Log::debug($plugin->getName() . ': Sample init subject profile plugin stuff: ' . $profile->name);
             $dispatcher->addSubscriber(new \Rs\Listener\CourseEditHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\SubjectEditHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\SubjectDashboardHandler());
-            // @deprecated No longer needed as companies should only have one class.
-            //$dispatcher->addSubscriber(new \Rs\Listener\CategoryClassHandler());
 
+            $dispatcher->addSubscriber(new \Rs\Listener\CategoryClassHandler());
+
+            $dispatcher->addSubscriber(new \Rs\Listener\PlacementManagerHandler());
+            $dispatcher->addSubscriber(new \Rs\Listener\PlacementViewHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\PlacementEditHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\PlacementConfirmHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\PlacementValidateHandler());
 
-            $dispatcher->addSubscriber(new \Rs\Listener\StudentAssessmentHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\AssessmentUnitsHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\CompanyViewHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\StaffSideMenuHandler());
@@ -56,6 +59,21 @@ class SetupHandler implements Subscriber
             $dispatcher->addSubscriber(new \Rs\Listener\CompanyEditHandler());
             $dispatcher->addSubscriber(new \Rs\Listener\PlacementImportHandler());
         }
+
+    }
+
+    /**
+     * @param \Symfony\Component\Console\Event\ConsoleCommandEvent $event
+     * @throws \Exception
+     */
+    public function onCommand(\Symfony\Component\Console\Event\ConsoleCommandEvent $event)
+    {
+        $config = \Uni\Config::getInstance();
+        $dispatcher = $config->getEventDispatcher();
+
+        $dispatcher->addSubscriber(new \Rs\Listener\StudentAssessmentHandler());
+        $dispatcher->addSubscriber(new \Rs\Listener\CategoryClassHandler());
+
 
     }
 
@@ -83,7 +101,8 @@ class SetupHandler implements Subscriber
     public static function getSubscribedEvents()
     {
         return array(
-            KernelEvents::REQUEST => array('onRequest', -10)
+            KernelEvents::REQUEST => array('onRequest', -10),
+            \Symfony\Component\Console\ConsoleEvents::COMMAND  => array('onCommand', -10)
         );
     }
     

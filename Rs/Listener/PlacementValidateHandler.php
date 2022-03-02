@@ -43,9 +43,9 @@ class PlacementValidateHandler implements Subscriber
         $ruleInfo = $calc->getRuleTotals();
 
         // Check rules for the placement
-        $placeRules = \Rs\Calculator::findPlacementRuleList($placement);
+        $placeRules = \Rs\Calculator::findPlacementRuleList($placement, false);
         if (!$placement->getId()) {
-            $placeRules = \Rs\Calculator::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), $placement->getSupervisor());
+            $placeRules = \Rs\Calculator::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), false);
         }
 
         $rulesIdList= array();
@@ -61,6 +61,7 @@ class PlacementValidateHandler implements Subscriber
             }
         }
 
+        // TODO: this autoApprove value whould be part of the company object and not in the Rs plugin
         $company = $placement->getCompany();
         if (!$company->getData()->get('autoApprove')) {
             $event->addError('Auto Approve', 'All placements with this company have to be manually approved.');

@@ -1,8 +1,14 @@
 <?php
 namespace Rs\Listener;
 
+use App\Controller\Student\Placement\Create;
+use App\Db\Placement;
+use Bs\DbEvents;
+use Rs\Calculator;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Tk\ConfigTrait;
 use Tk\Event\Subscriber;
+use Tk\Log;
 
 /**
  * @author Michael Mifsud <info@tropotek.com>
@@ -11,6 +17,7 @@ use Tk\Event\Subscriber;
  */
 class PlacementEditHandler implements Subscriber
 {
+    use ConfigTrait;
 
     /**
      * @var null|\App\Controller\Placement\Edit
@@ -51,13 +58,15 @@ class PlacementEditHandler implements Subscriber
         $company = \App\Db\CompanyMap::create()->find($request->get('companyId'));
         /** @var \App\Db\Subject $subject */
         $subject = \App\Db\SubjectMap::create()->find($request->get('subjectId'));
-        /** @var \App\Db\Supervisor $supervisor */
-        $supervisor = \App\Db\SupervisorMap::create()->find($request->get('supervisorId'));
+//        /** @var \App\Db\Supervisor $supervisor */
+//        $supervisor = \App\Db\SupervisorMap::create()->find($request->get('supervisorId'));
 
-        $data = \Rs\Calculator::findCompanyRuleList($company, $subject, $supervisor)->toArray('id');
+        // TODO: do we only need static rules here??
+        $data = \Rs\Calculator::findCompanyRuleList($company, $subject, false)->toArray('id');
         if ($placement) {
-            $data = \Rs\Calculator::findPlacementRuleList($placement)->toArray('id');
+            $data = \Rs\Calculator::findPlacementRuleList($placement, false)->toArray('id');
         }
+
         \Tk\ResponseJson::createJson($data)->send();
         exit;
     }
@@ -73,27 +82,52 @@ class PlacementEditHandler implements Subscriber
         if ($this->controller) {
             $this->placement = $this->controller->getPlacement();
 
-            $courseRules = \Rs\Calculator::findSubjectRuleList($this->placement->getSubject());
-            $companyRules = \Rs\Calculator::findCompanyRuleList($this->placement->getCompany(), $this->placement->getSubject(), $this->placement->getSupervisor())->toArray('id');
-            $placementRules = \Rs\Calculator::findPlacementRuleList($this->placement)->toArray('id');
+            $courseRules = \Rs\Calculator::findSubjectRuleList($this->placement->getSubject(), false);
+            $companyRules = \Rs\Calculator::findCompanyRuleList($this->placement->getCompany(), $this->placement->getSubject(), false);
+            $placementRules = \Rs\Calculator::findPlacementRuleList($this->placement, false);
 
-            $field = new \Tk\Form\Field\CheckboxGroup('rules', $courseRules);
-            if (!$this->placement->getId()) {
-                $field->setValue($companyRules);
-            } else {
-                $field->setValue($placementRules);
+            //$field = new \Tk\Form\Field\CheckboxGroup('rules', $courseRules);
+            $field = new \Tk\Form\Field\Radio('rules', $courseRules);
+            if (!$this->placement->getId() && $this->controller instanceof \App\Controller\Student\Placement\Create) {
+                $field = new \Tk\Form\Field\Radio('rules', $companyRules);
             }
+
+            $field->setArrayField(true);
+            $field->setValue($companyRules);
+            if (!$this->placement->getId() || $this->placement->getStatus() == Placement::STATUS_DRAFT) {
+                $field->setValue($companyRules->toArray('id'));
+            } else {
+                $field->setValue($placementRules->toArray('id'));
+            }
+
+            $field->addOnShowOption(function (\Dom\Template $template, \Tk\Form\Field\Option $option, $var) {
+                $catList = $this->placement->getCompany()->getCategoryList();
+                // Highlight the categories that are in the company list where possible
+                foreach ($catList as $cat) {
+                    if ($option->getName() == $cat->getName()) {
+                        if (!$this->placement->getId() && $this->controller instanceof \App\Controller\Student\Placement\Create) {
+                            $option->setName('[' . $cat->getClass() . '] ' . $option->getName());
+                        } else {
+                            $option->setName('* ' . $option->getName());
+                        }
+                        break;
+                    }
+                }
+            });
 
             $field->setAttr('data-placement-id', $this->placement->getId());
             $field->setAttr('data-company-id', $this->placement->companyId);
             $field->setAttr('data-subject-id', $this->placement->subjectId);
-            $field->setAttr('data-supervisor-id', $this->placement->supervisorId.'');
+            //$field->setAttr('data-supervisor-id', $this->placement->supervisorId.'');
 
             if ($this->controller instanceof \App\Controller\Student\Placement\Create) {
-                $field->setReadonly();
-                $field->setDisabled(true);
+                if ($this->placement->getId()) {
+                    $field->setReadonly();
+                    $field->setDisabled(true);
+                    $field->setAttr('data-hide-unselected');
+                }
                 $form->appendField($field, 'units');
-                $field->setAttr('data-hide-unselected');
+                $field->setNotes('If this company has multiple categories, please select your preferred placement experience');
             } else {
                 $field->setTabGroup('Details');
                 $form->appendField($field);
@@ -107,7 +141,7 @@ class PlacementEditHandler implements Subscriber
             if ($form->getField('submitForApproval'))
                 $form->addEventCallback('submitForApproval', array($this, 'doSubmit'));
 
-            // TODO: style the list to look nice....?
+            // style the list to look nice.
             $css = <<<CSS
 ul.assessment-credit {
   padding-left: 15px;
@@ -130,9 +164,13 @@ jQuery(function ($) {
       placementId: params.placementId, 
       companyId: params.companyId, 
       subjectId: params.subjectId, 
-      supervisorId: params.supervisorId
+      //supervisorId: params.supervisorId
     });
-    $(this).parent().find('input[type=checkbox]').prop('checked', false);
+    $(this).parent().find('input[type=checkbox],input[type=radio]').prop('checked', false);
+    
+    console.log(params);
+    console.log($(this).parent().find('input[type=checkbox],input[type=radio]'));
+    
     $.post(document.location, params, function (data) {
       checkboxList.each(function () {
         if(jQuery.inArray(parseInt($(this).val()), data) !== -1) {
@@ -150,10 +188,10 @@ jQuery(function ($) {
   
   $('.tk-rules').each(function () {
     var fieldGroup = $(this);
-    var checkboxList = fieldGroup.find('input[type=checkbox]');
-    
+    var checkboxList = fieldGroup.find('input[type=checkbox],input[type=radio]');
+    //console.log(checkboxList);
     if (config.roleType !== 'student') {
-        var resetBtn = $('<p><button type="button" class="btn btn-default btn-xs" title="Reset the assessment to the company defaults."><i class="fa fa-refresh"></i> Reset</button></p>');
+        var resetBtn = $('<p><button type="button" class="btn btn-default btn-xs" title="Reset the placement to the company default assessment credit."><i class="fa fa-refresh"></i> Reset</button></p>');
         fieldGroup.find(' > div').append(resetBtn);
         resetBtn.on('click', function () {
           //var checkboxList = $(this).parent().find('input[type=checkbox]');
@@ -161,11 +199,12 @@ jQuery(function ($) {
           return false;
         });
     }
-
-    if (fieldGroup.find('.checkbox-group').data('placementId') === '0') {
+    console.log(checkboxList.first().data('placementId'));
+    if (checkboxList.first().data('placementId') === '0') {
+    //if (fieldGroup.find('.checkbox-group').data('placementId') === '0') {
       setCheckboxes(checkboxList);
       fieldGroup.closest('form').find('.tk-supervisorid select').on('change', function () {
-        checkboxList.first().data('supervisor-id', $(this).val());
+        checkboxList.first().data('supervisorId', $(this).val());
         setCheckboxes(checkboxList);
       });
     }
@@ -189,12 +228,39 @@ JS;
         $selectedRules = $form->getFieldValue('rules');
         if (!is_array($selectedRules)) $selectedRules = array();
 
-        if(!$form->hasErrors()) {
-            \Rs\Db\RuleMap::create()->removePlacement(0, $this->placement->getVolatileId());
-            foreach ($selectedRules as $ruleId) {
-                \Rs\Db\RuleMap::create()->addPlacement($ruleId, $this->placement->getVolatileId());
-            }
+        \App\Config::getInstance()->getSession()->set(Create::SID.'_rules', $selectedRules);
+
+        if($form->hasErrors()) return;
+
+        // Remove non-static rules
+        \Rs\Db\RuleMap::create()->removeFromPlacement($this->placement);
+        // Add selected non-static rules
+        foreach ($selectedRules as $ruleId) {
+            \Rs\Db\RuleMap::create()->addPlacement($ruleId, $this->placement->getVolatileId());
         }
+
+    }
+
+    /**
+     * Assign new static rules at the time of placement creation
+     *
+     * @param \Bs\Event\DbEvent $event
+     * @throws \Exception
+     */
+    public function onPlacementInsert(\Bs\Event\DbEvent $event)
+    {
+        if (!$event->getModel() instanceof Placement) return;
+        /** @var Placement $placement */
+        $placement = $event->getModel();
+        // TODO: Assign new static rules at the time of placement creation
+        $companyStaticRules = Calculator::findCompanyRuleList($placement->getCompany(), $placement->getSubject(), true);
+        foreach ($companyStaticRules as $rule) {
+            if ($this->getConfig()->isDebug())
+                Log::alert(sprintf(' + Added new non-static rule to placement [p:%s => r:%s]: %s',
+                    $placement->getId(), $rule->getId(), $rule->getName()));
+            \Rs\Db\RuleMap::create()->addPlacement($rule->getId(), $placement->getId());
+        }
+
     }
 
     /**
@@ -204,7 +270,8 @@ JS;
     {
         return array(
             KernelEvents::CONTROLLER => array('onControllerInit', 0),
-            \Tk\Form\FormEvents::FORM_INIT => array('onFormInit', 0)
+            \Tk\Form\FormEvents::FORM_INIT => array('onFormInit', 0),
+            DbEvents::MODEL_INSERT_POST =>  array('onPlacementInsert', 0),
         );
     }
     

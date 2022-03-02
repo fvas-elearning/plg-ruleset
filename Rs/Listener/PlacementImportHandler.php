@@ -24,8 +24,14 @@ class PlacementImportHandler implements Subscriber
         $csvRow = $csvLog->getCsvRow();
         if (!$csvRow) return;
 
-        $rules = \Rs\Calculator::findPlacementRuleList($placement);
-        foreach ($rules as $rule) {
+//        $rules = \Rs\Calculator::findPlacementRuleList($placement);
+//        foreach ($rules as $rule) {
+//            \Rs\Db\RuleMap::create()->addPlacement($rule->getId(), $placement->getVolatileId());
+//        }
+        $rule = \Rs\Calculator::findDefaultPlacementRule($placement);
+        if ($rule) {
+            //\Rs\Db\RuleMap::create()->removePlacement(0, $placement->getVolatileId());
+            \Rs\Db\RuleMap::create()->removeFromPlacement($placement);
             \Rs\Db\RuleMap::create()->addPlacement($rule->getId(), $placement->getVolatileId());
         }
     }

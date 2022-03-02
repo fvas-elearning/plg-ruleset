@@ -8,7 +8,6 @@ use Tk\Event\Subscriber;
  * @author Michael Mifsud <info@tropotek.com>
  * @see http://www.tropotek.com/
  * @license Copyright 2015 Michael Mifsud
- * @deprecated No longer needed as companies should only have one class.
  */
 class CategoryClassHandler implements Subscriber
 {
@@ -23,19 +22,15 @@ class CategoryClassHandler implements Subscriber
      */
     public function onGetCompanyCategoryClass(\Tk\Event\Event $event)
     {
-        return;
-
         $plugin = Plugin::getInstance();
-        // NOTE: These vars are for the eval() function for finding the class value
+
         /** @var \App\Db\Company $company */
         $company = $event->get('company');
-        $catList = \App\Db\CompanyCategoryMap::create()->findFiltered(array(
-            'courseId' => $company->getCourseId(),
-            'companyId' => $company->getId()
-        ));
+        $class = trim($event->get('class'));
 
         $pluginData = \Tk\Db\Data::create($plugin->getName() . '.subject.course', $company->getCourseId());
         $script = $pluginData->get('plugin.company.get.class');
+
         if ($pluginData->get('plugin.active') && $script != null) {
             $calcClass = eval($script);
             if ($calcClass) {

@@ -54,8 +54,8 @@ class RuleSettings extends \App\Controller\AdminEditIface
         $this->setForm(\App\Config::getInstance()->createForm('formEdit'));
         $this->getForm()->setRenderer(\App\Config::getInstance()->createFormRenderer($this->getForm()));
 
-        $this->getForm()->appendField(new Field\Textarea('plugin.company.get.class'))->setLabel('Company Category Class')
-            ->setNotes('Add custom code to modify the company class calculation of Company::getCategoryClass() method')
+        $this->getForm()->appendField(new Field\Textarea('plugin.company.get.class'))->setLabel('Update Category Class')
+            ->setNotes('Add custom code to modify the company class calculation of Company::updateCategoryClass() method')
                 //. '<br/><em>Warning: This is deprecated as each company should only have one category class.</em>')
             ->setRequired(true)->addCss('code')->setAttr('data-mode', 'text/x-php');
 
