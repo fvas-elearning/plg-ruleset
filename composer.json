@@ -1,6 +1,6 @@
 {
-    "name": "ttek-plg/plg-ruleset",
-    "type": "ttek-plugin",
+    "name": "uom-plg/plg-ruleset",
+    "type": "uom-plugin",
     "description": "This plugin allows for rules to be attached to placement types and gives auto approve ability when students submit placements.",
     "keywords":  [
         "tropotek",
